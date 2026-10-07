@@ -14,11 +14,15 @@ export const perimeter: [number, number][] = [
   [295,640],[200,640],
 ];
 export const waypoints = {
-  extraction: { x: 360, y: 708, links: ['entry'] },
-  entry: { x: 360, y: 615, links: ['extraction', 'hall'] },
-  hall: { x: 470, y: 390, links: ['entry', 'junction'] },
+  extraction: { x: 360, y: 679, links: ['entry'] },
+  entry: { x: 360, y: 615, links: ['extraction', 'hall_south'] },
+  hall_south: { x: 450, y: 570, links: ['entry', 'hall_east'] },
+  hall_east: { x: 510, y: 540, links: ['hall_south', 'hall_north'] },
+  hall_north: { x: 510, y: 400, links: ['hall_east', 'hall'] },
+  hall: { x: 470, y: 390, links: ['hall_north', 'junction'] },
   junction: { x: 710, y: 390, links: ['hall', 'security', 'vault_door'] },
   security: { x: 710, y: 250, links: ['junction'] },
-  vault_door: { x: 710, y: 610, links: ['junction', 'relic'] },
-  relic: { x: 730, y: 692, links: ['vault_door'] },
+  vault_door: { x: 710, y: 580, links: ['junction', 'vault_entry'] },
+  vault_entry: { x: 710, y: 650, links: ['vault_door','relic'] },
+  relic: { x: 675, y: 700, links: ['vault_entry'] },
 };

@@ -67,9 +67,10 @@ export class SecurityCamera {
     const visible=previewVisible||this.discovered;
     this.cone.setVisible(visible&&this.active);
     this.mount.setVisible(visible);this.head.setVisible(visible);this.label.setVisible(visible);
-    if(!visible)return;
     if(this.active)this.elapsed+=Math.min(delta,100)/1000;
     this.direction=this.config.direction+Math.sin(this.elapsed*Math.PI*2/this.config.period+this.config.phase)*this.config.sweepAngle;
+    if(!visible)return;
+    this.label.setText(this.config.id.replace('camera_','C0')+(this.active?'':' · OFF'));
     this.head.clear();
     this.head.fillStyle(0x08121c).fillRoundedRect(-6,-7,24,14,3);
     this.head.fillStyle(0x87949c).fillRoundedRect(-5,-6,20,12,2);

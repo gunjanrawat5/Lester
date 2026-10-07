@@ -18,6 +18,16 @@ This is a game with moving characters and consequences, rather than a dashboard 
 
 Some earlier ideas were alternatives rather than fixed rules. This brief resolves them into concrete MVP defaults. Keep balance values configurable. Sponsor API details and credentials must be checked against the actual event-provided documentation; do not invent endpoints or SDK features.
 
+### Current voice-command rehearsal
+
+The preview now has a Q/field-comms panel. Hold to talk (or hold Space/Enter while the microphone button is focused), release, review the editable transcript, and press Send. Typed input follows the same strict action contract. Bond can move via waypoints to main-hall staging, security staging, the approach outside the locked vault, and extraction, or stop mid-route. Capture, transcription, and Bond turns pause Bond and camera sweeps until the response finishes. Cameras start hidden; proximity and line of sight reveal them, stop Bond, and trigger a spoken discovery report. The two-hack budget is engine-owned. Surveillance alarm consequences remain future work.
+
+Bond is a Fish Audio AI agent, using the public agent ID `e8434f5b6cc646c4b426c07d01ebfd72` through the official Web SDK. His reasoning and voice come from this agent, replacing the demo parser and separate TTS in Q mode. Typed commands and reviewed speech transcripts go to the same live session. Only validated `bond_command` client-tool calls can MOVE or STOP Bond. Public access and the published tool declaration are required; see [Bond setup](Fish_Bond_Agent_Setup.md). The configured agent voice is used without a separate Bond voice ID.
+
+Optional Fish Audio transcription uses server-side ASR with `FISH_API_KEY`; browser recognition remains an input fallback. Neither input provider replaces Bond's Fish reasoning. Captions remain available with sound muted. Bond's session closes when switching to guard dialogue or leaving the tab; the next Q order reconnects. Errors retain the draft and do not roll back confirmed engine actions.
+
+Guard persuasion is available when Bond is stationary within 60 pixels of the guard in security. Selecting Persuade switches from Q mode to speaking as Bond; Return to Q closes that conversation. The public Fish Audio guard agent `50a6c83da0584763bc7662f6908454a3` connects directly from the allowlisted Vite origin `http://127.0.0.1:5174` and replies through its own voice and calls `guard_reaction`. The active UI uses the public guard; connection failures return to Q. Suspicious turns add 15 engine-owned suspicion points, capped at 100. Three distinct persuasive turns transfer the keycard once. The engine emits suspicion/alarm events for the future alarm UI. See [Fish guard setup](Fish_Guard_Agent_Setup.md). Camera discovery, two camera hacks, card-gated vault access, relic collection, and extraction are now implemented. Alarm UI and surveillance detection consequences remain future work.
+
 ## 2. Scope and priorities
 
 | Priority | Deliverable |
@@ -66,7 +76,7 @@ A passage leaves the main hall to the right and meets a vertical corridor connec
 
 Use a hand-authored waypoint graph with spawn, doorway, cover, scout, interaction, and extraction nodes. Route Bond along valid edges; never tween directly through walls. Closed vault-door edges remain unavailable until opened. Complete collision and visibility geometry before enabling movement.
 
-The current map preview has five cameras: camera_1 through camera_4 in the main hall and camera_5 in the corridor leading down to the vault. Each camera head rotates with its translucent red, wall-clipped sector. All five are temporarily visible for visual review; later gameplay hides each camera and its cone until Bond discovers it and enables camera disabling. Detection and resource balancing remain a later implementation step. This five-camera layout supersedes earlier two-camera placement references in this brief. Tune sweep arcs against actual routes. The guard patrols security; add safe conversation and distraction markers for persuasion and alternate keycard approaches.
+The current map preview has five cameras: camera_1 through camera_4 in the main hall and camera_5 in the corridor leading down to the vault. Each camera head rotates with its translucent red, wall-clipped sector. All five start hidden, including their heads, labels, and sectors. Bond discovers each within 110 logical pixels and line of sight, stops, and asks Q what to do. Two remote hacks can permanently disable discovered cameras; CONTINUE resumes the interrupted route without repeating that camera’s discovery. Detection and resource balancing remain a later implementation step. This five-camera layout supersedes earlier two-camera placement references in this brief. Tune sweep arcs against actual routes. The guard patrols security; add safe conversation and distraction markers for persuasion and alternate keycard approaches.
 
 ### Discovery
 

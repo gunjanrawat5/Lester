@@ -1,0 +1,20 @@
+{
+  "tool_type": "client",
+  "name": "bond_command",
+  "description": "Execute one explicit Q order. MOVE, STOP, CONTINUE, HACK_CAMERA, OPEN_VAULT, TAKE_RELIC. Wait for the engine result and report it accurately.",
+  "arguments": [
+    {
+      "name": "type",
+      "description": "One uppercase string: MOVE, STOP, CONTINUE, HACK_CAMERA, OPEN_VAULT, TAKE_RELIC."
+    },
+    {
+      "name": "agent",
+      "description": "Always the string bond."
+    },
+    {
+      "name": "target",
+      "description": "MOVE: gallery, security, vault, entrance. HACK_CAMERA: current or discovered camera_1 through camera_5. Omit entirely for STOP, CONTINUE, OPEN_VAULT, TAKE_RELIC."
+    }
+  ],
+  "expects_response": true
+}

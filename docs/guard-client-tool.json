@@ -1,0 +1,10 @@
+{
+  "tool_type": "client",
+  "name": "guard_reaction",
+  "description": "Assess the current player's dialogue turn once. The game engine decides suspicion changes and keycard handover. Call before replying and use the returned state.",
+  "arguments": [
+    { "name": "reaction", "description": "Exactly one lowercase string: neutral, suspicious, or persuasive." },
+    { "name": "reason", "description": "Brief in-world explanation, a nonempty string of at most 160 characters." }
+  ],
+  "expects_response": true
+}
