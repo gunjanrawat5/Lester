@@ -15,11 +15,14 @@ export const perimeter: [number, number][] = [
 ];
 export const waypoints = {
   extraction: { x: 360, y: 679, links: ['entry'] },
-  entry: { x: 360, y: 615, links: ['extraction', 'hall_south'] },
+  entry: { x: 360, y: 615, links: ['extraction', 'hall_south', 'hall_left_south'] },
+  hall_left_south: {x:315,y:570,links:['entry','hall_left_mid']},
+  hall_left_mid: {x:315,y:405,links:['hall_left_south','hall_left_north']},
+  hall_left_north: {x:390,y:390,links:['hall_left_mid','hall']},
   hall_south: { x: 450, y: 570, links: ['entry', 'hall_east'] },
   hall_east: { x: 510, y: 540, links: ['hall_south', 'hall_north'] },
   hall_north: { x: 510, y: 400, links: ['hall_east', 'hall'] },
-  hall: { x: 470, y: 390, links: ['hall_north', 'junction'] },
+  hall: { x: 470, y: 390, links: ['hall_north', 'hall_left_north', 'junction'] },
   junction: { x: 710, y: 390, links: ['hall', 'security', 'vault_door'] },
   security: { x: 710, y: 250, links: ['junction'] },
   vault_door: { x: 710, y: 580, links: ['junction', 'vault_entry'] },

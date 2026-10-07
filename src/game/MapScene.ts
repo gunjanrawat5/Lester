@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { MissionState } from './mission';
+import { MissionState, CAMERA_DETECTION_ALARM } from './mission';
 import { SecurityCamera, securityCameraLayout, cameraRay } from './securityCameras';
 import { MAP_WIDTH as W, MAP_HEIGHT as H, perimeter, waypoints } from './map';
 import { routeBetween, type NodeId } from './previewNavigation';
@@ -11,9 +11,18 @@ export class MapScene extends Phaser.Scene {
   commsPaused = false;
   onGuardAvailable: (available: boolean) => void = () => {};
   onGuardEvent: (event: GuardGameEvent) => void = () => {};
-  readonly guard = new GuardInteraction(() => this.nearGuard(), event => this.onGuardEvent(event));
+  readonly guard = new GuardInteraction(() => this.nearGuard(), event => this.handleGuardEvent(event));
   private guardAvailable = false;
+  private guardSprite?: Phaser.GameObjects.Image;
   private guardMarker?: Phaser.GameObjects.Arc;
+  private handleGuardEvent(event:GuardGameEvent){
+    if(event.type==='SUSPICION_CHANGED')this.mission.addAlarm(40);
+    if(event.type==='GUARD_DOWN')this.mission.addAlarm(20);
+    this.onGuardEvent(event);this.checkAlarm();this.onMissionChange();
+  }
+  private checkAlarm(){
+    if(this.mission.failed){this.route=[];this.destination=undefined;this.interrupted=undefined;this.onMissionChange();}
+  }
   private nearGuard() {
     return Boolean(this.bond && !this.route.length && this.bond.x >= 630 && this.bond.x <= 875 && this.bond.y >= 100 && this.bond.y <= 280 && Math.hypot(this.bond.x - 706, this.bond.y - 213) <= GUARD_RULES.conversationRange);
   }
@@ -33,9 +42,13 @@ export class MapScene extends Phaser.Scene {
   private route: NodeId[] = [];
   private destination?: PreviewAction & { type: 'MOVE' };
   missionContext(){
-    return {hacksRemaining:this.mission.hacksRemaining,cameras:this.mission.cameras.filter(c=>c.discovered).map(c=>({id:c.id,active:c.active})),currentCamera:this.mission.pendingCamera??'',keycardOwned:this.guard.keycardOwned,vaultOpen:this.mission.vaultOpen,relicOwned:this.mission.relicOwned,complete:this.mission.complete};
+    return {hacksRemaining:this.mission.hacksRemaining,cameras:this.mission.cameras.filter(c=>c.discovered).map(c=>({id:c.id,active:c.active})),currentCamera:this.mission.pendingCamera??'',keycardOwned:this.guard.keycardOwned,vaultOpen:this.mission.vaultOpen,relicOwned:this.mission.relicOwned,complete:this.mission.complete,alarm:this.mission.alarm,failed:this.mission.failed,guardSuspicion:this.guard.suspicion,guardKnockedDown:this.guard.knockedDown};
   }
   runCommand(action: PreviewAction): { accepted: boolean; text: string } {
+    if(this.mission.failed)return {accepted:false,text:'Alarm at 100. Mission compromised. Restart to try again.'};
+    if(action.type==='KNOCK_DOWN_GUARD'){
+      const result=this.guard.knockDown();if(result.accepted){this.guardSprite?.setAngle(180).setTint(0x5b6570).setAlpha(.6);this.guardMarker?.setVisible(false);}return result;
+    }
     if (this.guard.active) return { accepted: false, text: 'You are speaking as Bond. Return to Q before giving commands.' };
     if (!this.bond) return { accepted: false, text: 'Map is still loading. Try again in a moment.' };
     if(this.mission.complete)return {accepted:false,text:'Mission complete. Bond and the relic are safely extracted.'};
@@ -62,7 +75,7 @@ export class MapScene extends Phaser.Scene {
     }
     if (this.route.length) return { accepted: false, text: 'Already moving, Q. Say “stop” before giving me a new destination.' };
     const targets: Record<string, NodeId> = { gallery: 'hall', security: 'security', vault: this.mission.vaultOpen?'relic':'vault_door', entrance: 'extraction' };
-    const route = routeBetween(this.currentNode, targets[action.target],this.mission.vaultOpen);
+    const route = routeBetween(this.currentNode, targets[action.target],this.mission.vaultOpen,action.via);
     if (!route.length) return { accepted: false, text: 'That route is unavailable.' };
     this.interrupted=undefined;this.collectOnArrival=false;this.route = route; this.destination = action;
     return { accepted: true, text: action.target === 'vault' ? (this.guard.keycardOwned?'Moving to the vault. I’ll use the keycard at the door.':'Moving to the locked vault door. We need the guard’s keycard to enter.') : `Moving to ${action.target === 'gallery' ? 'the main hall' : action.target === 'entrance' ? 'extraction' : 'security staging'}, Q.` };
@@ -92,7 +105,7 @@ export class MapScene extends Phaser.Scene {
 
     }
     this.guardMarker?.setVisible(available || this.guard.active);
-    if (this.commsPaused || this.guard.active || document.hidden) return;
+    if (this.commsPaused || this.guard.active || this.mission.failed || this.mission.complete || document.hidden) return;
     if (this.bond && this.route.length) {
       const next = this.route[0], point = waypoints[next];
       const dx = point.x - this.bond.x, dy = point.y - this.bond.y;
@@ -115,6 +128,10 @@ export class MapScene extends Phaser.Scene {
       if(camera){this.interrupted=this.destination;this.route=[];this.destination=undefined;this.onMissionChange();this.onDiscovery(`Camera spotted: ${camera.id.replace('camera_','C0')}. Holding position, Q. What should I do? You have ${this.mission.hacksRemaining} camera hacks remaining.`);}
     }
     this.renderCameras(delta);
+    if(this.bond){
+      const detections=this.mission.detectCameras(this.securityCameras.filter(camera=>camera.detects(this.bond!)).map(camera=>camera.config.id),Math.min(delta,100));
+      if(detections.length){this.onFeedback(`${detections.map(id=>id.replace('camera_','Camera ')).join(', ')} detected Bond. +${CAMERA_DETECTION_ALARM} alarm per camera.`);this.onMissionChange();this.checkAlarm();}
+    }
   }
   preload() {
     this.load.image('bond', '/assets/kenney/bond.png');
@@ -199,6 +216,8 @@ export class MapScene extends Phaser.Scene {
     fixture(697,673,69,69);fixture(707,680,49,46);
     fixture(624,687,26,54);fixture(817,657,20,76);
     lamp(689,771,29);
+    ctx.save();ctx.setLineDash([3,7]);ctx.strokeStyle='#74b9bc28';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(360,615);ctx.lineTo(315,570);ctx.lineTo(315,405);ctx.lineTo(390,390);ctx.lineTo(470,390);ctx.stroke();ctx.restore();
+    label('WEST ROUTE',315,540,8);
     label('MAIN HALL',377,567,19);label('01 / PUBLIC GALLERY',377,584,9);
     label('SECURITY ROOM',752,273,14);
     label('VAULT',732,758,17);
@@ -221,7 +240,7 @@ export class MapScene extends Phaser.Scene {
     this.bondLabel=this.add.text(389,677,'007',{fontFamily:'monospace',fontSize:'10px',color:'#8ae2d7'});
     this.guardMarker = this.add.circle(706,213,24,0xd6b983,.06).setStrokeStyle(1,0xd6b983,.6).setVisible(false);
     this.add.ellipse(706,224,27,12,0x000000,.25);
-    this.add.image(706,213,'guard').setDisplaySize(25,32).setAngle(90).setTint(0xa6afb8);
+    this.guardSprite=this.add.image(706,213,'guard').setDisplaySize(25,32).setAngle(90).setTint(0xa6afb8);
     // Map selection highlights objects; it never moves Bond.
     const selection=this.add.graphics().setDepth(10);
     this.input.on('pointerdown',(p:Phaser.Input.Pointer)=>{

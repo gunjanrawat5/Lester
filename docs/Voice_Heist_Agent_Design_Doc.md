@@ -1,6 +1,6 @@
 # Voice Heist — Agent Design & Implementation Brief
 
-Version 1.1 — Bond/Q revision · October 7, 2026 · Hackathon build window: 11:00 AM–3:00 PM
+Version 1.2 — Bond/Q revision · October 7, 2026 · Hackathon build window: 11:00 AM–3:00 PM
 
 ## 1. Your assignment
 
@@ -20,13 +20,13 @@ Some earlier ideas were alternatives rather than fixed rules. This brief resolve
 
 ### Current voice-command rehearsal
 
-The preview now has a Q/field-comms panel. Hold to talk (or hold Space/Enter while the microphone button is focused), release, review the editable transcript, and press Send. Typed input follows the same strict action contract. Bond can move via waypoints to main-hall staging, security staging, the approach outside the locked vault, and extraction, or stop mid-route. Capture, transcription, and Bond turns pause Bond and camera sweeps until the response finishes. Cameras start hidden; proximity and line of sight reveal them, stop Bond, and trigger a spoken discovery report. The two-hack budget is engine-owned. Surveillance alarm consequences remain future work.
+The comms panel now follows the cyan tactical reference: segmented alarm, overrides/keycard/relic row, mic orb, voice transcript, reply portraits/history, separate typed command panel, and mute/settings controls. Tap the mic to speak, with a separate Mute control; the completed transcript auto-sends to the active agent without overwriting the typed draft. Fish capture ends after roughly 1.4 seconds of silence, browser speech on utterance end, or tap mic again to finish. Cancellation, blank transcripts, and errors send nothing.
 
 Bond is a Fish Audio AI agent, using the public agent ID `e8434f5b6cc646c4b426c07d01ebfd72` through the official Web SDK. His reasoning and voice come from this agent, replacing the demo parser and separate TTS in Q mode. Typed commands and reviewed speech transcripts go to the same live session. Only validated `bond_command` client-tool calls can MOVE or STOP Bond. Public access and the published tool declaration are required; see [Bond setup](Fish_Bond_Agent_Setup.md). The configured agent voice is used without a separate Bond voice ID.
 
 Optional Fish Audio transcription uses server-side ASR with `FISH_API_KEY`; browser recognition remains an input fallback. Neither input provider replaces Bond's Fish reasoning. Captions remain available with sound muted. Bond's session closes when switching to guard dialogue or leaving the tab; the next Q order reconnects. Errors retain the draft and do not roll back confirmed engine actions.
 
-Guard persuasion is available when Bond is stationary within 60 pixels of the guard in security. Selecting Persuade switches from Q mode to speaking as Bond; Return to Q closes that conversation. The public Fish Audio guard agent `50a6c83da0584763bc7662f6908454a3` connects directly from the allowlisted Vite origin `http://127.0.0.1:5174` and replies through its own voice and calls `guard_reaction`. The active UI uses the public guard; connection failures return to Q. Suspicious turns add 15 engine-owned suspicion points, capped at 100. Three distinct persuasive turns transfer the keycard once. The engine emits suspicion/alarm events for the future alarm UI. See [Fish guard setup](Fish_Guard_Agent_Setup.md). Camera discovery, two camera hacks, card-gated vault access, relic collection, and extraction are now implemented. Alarm UI and surveillance detection consequences remain future work.
+Guard persuasion is available when Bond is stationary within 60 pixels of the guard in security. Selecting Persuade switches from Q mode to speaking as Bond; Return to Q closes that conversation. The public Fish Audio guard agent `50a6c83da0584763bc7662f6908454a3` connects directly from the allowlisted Vite origin `http://127.0.0.1:5174` and replies through its own voice and calls `guard_reaction`. The active UI uses the public guard; connection failures return to Q. Suspicious turns add 15 engine-owned suspicion points, capped at 100. Three distinct persuasive turns transfer the keycard once. The engine emits suspicion/alarm events for the future alarm UI. See [Fish guard setup](Fish_Guard_Agent_Setup.md). Camera discovery, two camera hacks, card-gated vault access, relic collection, and extraction are now implemented. The shared alarm HUD and camera detection are now implemented. A suspicious nearby guard can be knocked down during conversation, ending the session and recovering the keycard.
 
 ## 2. Scope and priorities
 
@@ -76,7 +76,7 @@ A passage leaves the main hall to the right and meets a vertical corridor connec
 
 Use a hand-authored waypoint graph with spawn, doorway, cover, scout, interaction, and extraction nodes. Route Bond along valid edges; never tween directly through walls. Closed vault-door edges remain unavailable until opened. Complete collision and visibility geometry before enabling movement.
 
-The current map preview has five cameras: camera_1 through camera_4 in the main hall and camera_5 in the corridor leading down to the vault. Each camera head rotates with its translucent red, wall-clipped sector. All five start hidden, including their heads, labels, and sectors. Bond discovers each within 110 logical pixels and line of sight, stops, and asks Q what to do. Two remote hacks can permanently disable discovered cameras; CONTINUE resumes the interrupted route without repeating that camera’s discovery. Detection and resource balancing remain a later implementation step. This five-camera layout supersedes earlier two-camera placement references in this brief. Tune sweep arcs against actual routes. The guard patrols security; add safe conversation and distraction markers for persuasion and alternate keycard approaches.
+The current map preview has five cameras: camera_1 through camera_4 in the main hall and camera_5 in the corridor leading down to the vault. Camera heads and red wall-clipped sectors have fixed directions and never sweep. All five start hidden, including their heads, labels, and sectors. Bond discovers each within 110 logical pixels and line of sight, stops, and asks Q what to do. Two remote hacks can permanently disable discovered cameras; CONTINUE resumes the interrupted route without repeating that camera’s discovery. Active camera detection adds +50 shared alarm per exposure; it re-arms after two seconds outside. Suspicious guard turns add +40, knockdown adds +20. The shared meter caps at 100 and compromises the mission. This five-camera layout supersedes earlier two-camera placement references in this brief. Tune sweep arcs against actual routes. The guard patrols security; add safe conversation and distraction markers for persuasion and alternate keycard approaches.
 
 ### Discovery
 
@@ -142,7 +142,7 @@ Resume as soon as validated actions are queued, except while awaiting an active 
 
 ### Cameras
 
-Each camera has a fixed position, sweeping direction, range, cone angle, active flag, and discovered flag. Draw a translucent red sector with a clear red boundary once discovered. Disabled cameras become gray/cyan and lose their active cone.
+Each camera has a fixed position and direction, range, cone angle, active flag, and discovered flag. Draw a translucent red sector with a clear red boundary once discovered. Disabled cameras become gray/cyan and lose their active cone.
 
 Detect an agent only when active, within range, inside the cone, and unobstructed by walls. Compute the signed angular difference with wraparound. Use the same geometry for rendering and detection. Hidden agents are protected only at valid cover markers; HIDE anywhere in an open room does not make them invisible.
 
@@ -168,7 +168,7 @@ Bond's DISTRACT_GUARD first routes him to the distraction point. On arrival, add
 
 STEAL_KEY routes Bond to a behind-guard interaction marker. Complete only within 28 px and while Bond is outside the guard's cone or the guard is knocked out. If the guard turns and observes Bond, fail the steal and let ordinary detection rules apply. Transfer the unique keycard to Bond's inventory exactly once.
 
-KNOCKOUT_GUARD is allowed for Bond. Route to an interaction point, require proximity, mark the guard unconscious, stop his patrol, and expose his keycard for a separate STEAL_KEY action. Knockout itself does not automatically grant the key or add suspicion; getting seen during the approach can still do so.
+KNOCK_DOWN_GUARD requires a nearby guard who has become suspicious. It can be triggered directly from the active guard-dialogue panel or ordered through Bond after returning to Q. The engine marks the guard down, terminates and invalidates his session, adds +20 shared alarm, and recovers the keycard once. It cannot be repeated or executed against a calm/out-of-range guard.
 
 ### Radio and reinforcement
 
@@ -391,9 +391,9 @@ Keep this deterministic. Before a MOVE through a discovered active cone, the eng
 
 ### Voice loop
 
-Hold the microphone button to record; release to transcribe. Handle pointer release outside the button and pointer cancellation so recording cannot get stuck. Offer a keyboard shortcut only when the text field is not focused.
+Tap the microphone to record one utterance. Pause Bond during capture and never restart recording automatically after a reply. Send voice automatically when the player stops speaking; permit a second tap to finish immediately. Cancel capture on blur, hidden tab, mic mute, role changes, and recording errors. Keep typed text separate with its own manual Send control.
 
-Transcription appears in the text box and comms feed. Send it through the exact same interpreter as typed text. If confidence is low or the transcript is empty, leave the editable text ready and execute nothing. On microphone denial or service error, show a short status and retain text input.
+Transcription appears in the separate YOU SAID area and sends automatically. Send it through the exact same interpreter as typed text. If confidence is low or the transcript is empty, leave the editable text ready and execute nothing. On microphone denial or service error, show a short status and retain text input.
 
 Select two stock/provider-approved voices if available. Serialize character playback so voices do not overlap. Stop or duck playback before recording to prevent the microphone hearing Bond. Limit the speech queue; prioritize new threat, radio, and lockdown warnings over idle banter. Captions appear even if TTS fails.
 
@@ -484,3 +484,7 @@ Implement this brief incrementally and run the game after each major stage. Firs
 Do not replace the moving 2D game with static cards. Do not let LLM prose award outcomes. Do not leak unknown threats into conversational context. Do not expose provider secrets in the frontend. Do not add features that put the four-hour delivery at risk.
 
 At handoff, provide the working project, exact start/build commands, required environment variable names, verified demo commands, a short validation report, and any unfinished integration limitations. The user should be able to start the game and rehearse immediately.
+
+Current layout update: left-wall cameras camera_1 and camera_3 are removed. Only camera_2 and camera_4 on the right side of Main Hall and camera_5 in the vault corridor remain. Each active camera exposure adds +50 shared alarm; discovery alone does not add alarm.
+
+At alarm 100, stop gameplay and voice sessions and show a blocking Game Over screen. Play Again resets all mission state. C02 is repositioned to (510, 315), facing down; remaining cameras stay static.

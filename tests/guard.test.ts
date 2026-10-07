@@ -11,13 +11,13 @@ const reaction = (guard:GuardInteraction, session:string, text:string, kind='sus
 test('guard conversation requires proximity; stale and duplicate reactions cannot raise suspicion',()=>{
   let nearby=false;const events:GuardGameEvent[]=[];const guard=new GuardInteraction(()=>nearby,e=>events.push(e));
   assert.equal(guard.begin(),undefined);nearby=true;const session=guard.begin()!;
-  const first=reaction(guard,session,'I will steal the relic');assert.equal(first.result.suspicion,15);
+  const first=reaction(guard,session,'I will steal the relic');assert.equal(first.result.suspicion,40);
   guard.applyReaction(session,first.turn,first.callId,{reaction:'suspicious',reason:'Repeat'});
   guard.applyReaction(session,first.turn,randomUUID(),{reaction:'suspicious',reason:'Second call for same turn'});
-  assert.equal(guard.suspicion,15);assert.equal(events.length,1);
+  assert.equal(guard.suspicion,40);assert.equal(events.length,1);
   const next=guard.beginTurn(session,'New turn')!;
   guard.applyReaction(session,first.turn,randomUUID(),{reaction:'suspicious',reason:'Old turn'});
-  assert.equal(guard.suspicion,15);
+  assert.equal(guard.suspicion,40);
   assert.equal(guard.applyReaction(session,next,randomUUID(),{reaction:'suspicious',reason:'Extra',delta:100}).accepted,false);
   nearby=false;assert.equal(guard.applyReaction(session,next,randomUUID(),{reaction:'suspicious',reason:'Out of range'}).accepted,false);
   guard.end();nearby=true;assert.equal(guard.applyReaction(session,next,randomUUID(),{reaction:'suspicious',reason:'After returning to Q'}).accepted,false);
@@ -62,4 +62,13 @@ test('private guard session uses a server key, guard voice override, safe contex
     globalThis.fetch=original;
     ['FISH_API_KEY','FISH_GUARD_AGENT_ID','FISH_GUARD_VOICE_ID'].forEach((name,i)=>{if(saved[i]===undefined)delete process.env[name];else process.env[name]=saved[i];});
   }
+});
+
+test('knockdown requires suspicion and proximity, cancels dialogue, grants one card and cannot repeat',()=>{
+ let nearby=true;const events:GuardGameEvent[]=[];const guard=new GuardInteraction(()=>nearby,e=>events.push(e));
+ assert.equal(guard.knockDown().accepted,false);const session=guard.begin()!;const assessed=reaction(guard,session,'Suspicious cover');assert.equal(guard.suspicion,40);
+ nearby=false;assert.equal(guard.knockDown().accepted,false);nearby=true;assert.equal(guard.canKnockDown,true);assert.equal(guard.knockDown().accepted,true);
+ assert.equal(guard.active,false);assert.equal(guard.keycardOwned,true);assert.equal(guard.knockedDown,true);assert.equal(guard.available,false);
+ assert.equal(guard.applyReaction(session,assessed.turn,randomUUID(),{reaction:'suspicious',reason:'Late'}).accepted,false);
+ assert.equal(guard.knockDown().accepted,false);assert.equal(events.filter(e=>e.type==='GUARD_DOWN').length,1);assert.equal(events.filter(e=>e.type==='KEYCARD_ACQUIRED').length,1);
 });

@@ -1,5 +1,5 @@
 import type { AgentSession } from '@fishaudio/agent-client';
-import { actionSchema, type PreviewAction } from '../ai/contracts';
+import { bondToolActionSchema, type PreviewAction } from '../ai/contracts';
 export const BOND_AGENT_ID = 'e8434f5b6cc646c4b426c07d01ebfd72';
 type Pending = { allowActions:boolean; acted:boolean; response:boolean; resolve(acted:boolean):void; reject(error:Error):void; timer:number };
 /** Fish owns Bond's reasoning and voice; only validated tools can move him. */
@@ -20,7 +20,7 @@ export class BondDialogue {
     const session=await AgentSession.start({agentId:BOND_AGENT_ID,microphone:false,wakeLock:false,worldContext:false,
       clientTools:{bond_command:(params,{callId})=>{
         if(!current()||!this.pending||!this.pending.allowActions||this.pending.acted||this.calls.has(callId))return {accepted:false,text:'No current Q order, or this order already called a tool.'};
-        const parsed=actionSchema.safeParse(params);
+        const parsed=bondToolActionSchema.safeParse(params);
         if(!parsed.success)return {accepted:false,text:'Invalid game action. Use the declared action types and exact fields. STOP, CONTINUE, OPEN_VAULT, TAKE_RELIC have no target. MOVE and HACK_CAMERA require target.'};
         this.calls.add(callId);
         this.pending.acted=true;

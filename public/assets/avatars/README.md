@@ -1,0 +1,1 @@
+Supplied portraits: bond-security.png contains Bond (left) and Security (right); q.png contains Q. CSS frames each face inside circular avatars, excluding screenshot selection borders. Source screenshots are preserved. Contact and conversation history use these portraits.

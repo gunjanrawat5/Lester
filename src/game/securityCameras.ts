@@ -5,15 +5,13 @@ type Point = { x: number; y: number };
 type Segment = readonly [Point, Point];
 export type SecurityCameraConfig = {
   id: string; x: number; y: number; direction: number; range: number;
-  coneAngle: number; sweepAngle: number; period: number; phase: number;
+  coneAngle: number;
 };
 const radians = Phaser.Math.DegToRad;
 export const securityCameraLayout: SecurityCameraConfig[] = [
-  { id: 'camera_1', x: 229, y: 364, direction: radians(30), range: 145, coneAngle: radians(60), sweepAngle: radians(24), period: 7, phase: 0 },
-  { id: 'camera_2', x: 526, y: 364, direction: radians(150), range: 145, coneAngle: radians(60), sweepAngle: radians(24), period: 8, phase: 1.4 },
-  { id: 'camera_3', x: 229, y: 548, direction: radians(-30), range: 145, coneAngle: radians(60), sweepAngle: radians(24), period: 8.5, phase: 2.6 },
-  { id: 'camera_4', x: 526, y: 548, direction: radians(210), range: 145, coneAngle: radians(60), sweepAngle: radians(24), period: 7.5, phase: .8 },
-  { id: 'camera_5', x: 739, y: 430, direction: radians(105), range: 170, coneAngle: radians(48), sweepAngle: radians(15), period: 9, phase: 1.8 },
+  { id: 'camera_2', x: 510, y: 315, direction: radians(90), range: 145, coneAngle: radians(60) },
+  { id: 'camera_4', x: 526, y: 548, direction: radians(210), range: 145, coneAngle: radians(60) },
+  { id: 'camera_5', x: 739, y: 430, direction: radians(105), range: 170, coneAngle: radians(48) },
 ];
 // Room-divider edges supplement the outer silhouette. The vault threshold
 // blocks this preview's corridor cone; unlock/door state will drive it later.
@@ -48,7 +46,7 @@ export class SecurityCamera {
   active=true;
   discovered=false;
   direction:number;
-  private elapsed=0;
+
   private readonly cone:Phaser.GameObjects.Graphics;
   private readonly mount:Phaser.GameObjects.Graphics;
   private readonly head:Phaser.GameObjects.Graphics;
@@ -63,12 +61,20 @@ export class SecurityCamera {
     this.head=scene.add.graphics({x:config.x,y:config.y}).setDepth(3);
     this.label=scene.add.text(config.x,config.y-17,config.id.replace('camera_','C0'),{fontFamily:'monospace',fontSize:'8px',color:'#e6a5a0',backgroundColor:'#141a22',padding:{x:3,y:2}}).setOrigin(.5).setDepth(3);
   }
-  render(delta:number,previewVisible:boolean){
+  detects(point:Point){
+    if(!this.active)return false;
+    const dx=point.x-this.config.x,dy=point.y-this.config.y,distance=Math.hypot(dx,dy);
+    if(distance>this.config.range)return false;
+    const angle=Math.atan2(dy,dx),difference=Math.atan2(Math.sin(angle-this.direction),Math.cos(angle-this.direction));
+    if(Math.abs(difference)>this.config.coneAngle/2)return false;
+    const hit=cameraRay(this.config,angle,distance);
+    return Math.hypot(hit.x-this.config.x,hit.y-this.config.y)>=distance-1;
+  }
+  render(_delta:number,previewVisible:boolean){
     const visible=previewVisible||this.discovered;
     this.cone.setVisible(visible&&this.active);
     this.mount.setVisible(visible);this.head.setVisible(visible);this.label.setVisible(visible);
-    if(this.active)this.elapsed+=Math.min(delta,100)/1000;
-    this.direction=this.config.direction+Math.sin(this.elapsed*Math.PI*2/this.config.period+this.config.phase)*this.config.sweepAngle;
+    this.direction=this.config.direction;
     if(!visible)return;
     this.label.setText(this.config.id.replace('camera_','C0')+(this.active?'':' · OFF'));
     this.head.clear();

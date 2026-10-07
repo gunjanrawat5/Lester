@@ -27,8 +27,9 @@ export class GuardDialogue {
         dynamicVariables:{player_role:'James Bond',guard_location:'Security Room',suspicion:this.engine.suspicion,persuasion:this.engine.persuasion,keycard_owned:this.engine.keycardOwned},
         clientTools:{ guard_reaction:(params,{callId})=>{
           if(!current() || !this.pending) return {accepted:false,reason:'No current player turn. Do not change inventory or alarm state.'};
-          const outcome=this.engine.applyReaction(token,this.pending.id,callId,params);
-          if(outcome.accepted){this.pending.assessed=true;this.pending.outcome=outcome;this.finishTurn();}
+          const pending=this.pending;
+          const outcome=this.engine.applyReaction(token,pending.id,callId,params);
+          if(outcome.accepted&&current()&&this.pending===pending){pending.assessed=true;pending.outcome=outcome;this.finishTurn();}
           return outcome;
         } },
         callbacks:{

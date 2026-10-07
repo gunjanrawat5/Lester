@@ -22,6 +22,23 @@ export class CommandMicrophone {
   private upload?: AbortController;
   private timer?: number;
   private timeout?: number;
+  private audioContext?:AudioContext;
+  private silenceTimer?:number;
+  private stopSilenceDetection(){window.clearInterval(this.silenceTimer);this.silenceTimer=undefined;void this.audioContext?.close().catch(()=>{});this.audioContext=undefined;}
+  private watchSilence(stream:MediaStream,current:()=>boolean){
+    if(typeof AudioContext==='undefined')return;
+    try{
+      const context=this.audioContext=new AudioContext(),analyser=context.createAnalyser();analyser.fftSize=1024;
+      context.createMediaStreamSource(stream).connect(analyser);void context.resume().catch(()=>{});
+      const samples=new Float32Array(analyser.fftSize);let heard=false,lastSpeech=performance.now(),voicedFrames=0;
+      this.silenceTimer=window.setInterval(()=>{
+        if(!current()||!this.holding)return;
+        analyser.getFloatTimeDomainData(samples);const rms=Math.sqrt(samples.reduce((sum,v)=>sum+v*v,0)/samples.length);
+        if(rms>.018){voicedFrames++;if(voicedFrames>=3){heard=true;}lastSpeech=performance.now();}
+        if(heard&&performance.now()-lastSpeech>=1400){this.callbacks.status('Speech finished. Sending automatically…');this.release();}
+      },80);
+    }catch{this.stopSilenceDetection();}
+  }
   constructor(private readonly callbacks: MicrophoneCallbacks) {}
   async start(provider: 'fish' | 'browser') {
     if (this.active) return;
@@ -34,7 +51,7 @@ export class CommandMicrophone {
         const Constructor = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
         if (!Constructor) throw new Error('Browser speech is unavailable here. Use Chrome, configure Fish Audio, or type your command.');
         const recognition = this.recognition = new Constructor();
-        recognition.lang = 'en-US'; recognition.continuous = true; recognition.interimResults = true;
+        recognition.lang = 'en-US'; recognition.continuous = false; recognition.interimResults = true;
         const parts: string[] = []; let failed = false;
         recognition.onresult = event => {
           if (!current()) return;
@@ -48,7 +65,7 @@ export class CommandMicrophone {
         recognition.onend = () => {
           if (!current()) return;
           const text = parts.filter(Boolean).join(' ').trim();
-          if (!failed) { if (text) this.callbacks.transcript(text); else this.callbacks.error('No speech captured. Hold the mic while speaking, or type a command.'); }
+          if (!failed) { if (text) this.callbacks.transcript(text); else this.callbacks.error('No speech captured. Speak your command, or type it.'); }
           this.finish(revision);
         };
         recognition.start();
@@ -69,7 +86,7 @@ export class CommandMicrophone {
           this.stream = undefined; this.recorder = undefined; window.clearTimeout(this.timer);
           try {
             const audio = new Blob(chunks, { type: mimeType });
-            if (!audio.size) throw new Error('No audio recorded. Hold the mic while speaking.');
+            if (!audio.size) throw new Error('No audio recorded. Speak your command.');
             this.callbacks.status('Transcribing with Fish Audio…');
             const data = new FormData(); data.append('audio', audio, mimeType.includes('mp4') ? 'command.mp4' : mimeType.includes('ogg') ? 'command.ogg' : 'command.webm');
             const controller = this.upload = new AbortController();
@@ -84,9 +101,9 @@ export class CommandMicrophone {
             if (current()) this.callbacks.error(error instanceof Error && error.name !== 'AbortError' ? error.message : 'Transcription timed out. Try again or use text.');
           } finally { this.finish(revision); }
         };
-        recorder.start();
+        recorder.start();this.watchSilence(stream,current);
       }
-      if (current()) { this.callbacks.status('Listening… release to finish'); this.timer = window.setTimeout(() => this.release(), 15000); }
+      if (current()) { this.callbacks.status('Listening… Pause to send, or tap the mic to finish.'); this.timer = window.setTimeout(() => this.release(), 15000); }
     } catch (error) {
       if (!current()) return;
       this.callbacks.error(error instanceof DOMException && error.name === 'NotAllowedError' ? 'Microphone permission denied. You can still type commands.' : error instanceof Error ? error.message : 'Microphone unavailable. Use text.');
@@ -95,7 +112,7 @@ export class CommandMicrophone {
   }
   release(cancel = false) {
     if (!this.active) return;
-    this.holding = false; window.clearTimeout(this.timer);
+    this.holding = false;this.stopSilenceDetection(); window.clearTimeout(this.timer);
     if (cancel) { this.finish(this.revision); return; }
     if (this.recorder?.state === 'recording') this.recorder.stop();
     if (this.recognition) {
@@ -107,7 +124,7 @@ export class CommandMicrophone {
   }
   private finish(revision: number) {
     if (!this.active || revision !== this.revision) return;
-    this.active = false; this.holding = false; this.revision++;
+    this.active = false; this.holding = false;this.stopSilenceDetection(); this.revision++;
     window.clearTimeout(this.timer); window.clearTimeout(this.timeout); this.upload?.abort(); this.upload = undefined;
     const recorder = this.recorder; this.recorder = undefined;
     if (recorder?.state === 'recording') recorder.stop();

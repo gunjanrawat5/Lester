@@ -1,11 +1,11 @@
 {
   "tool_type": "client",
   "name": "bond_command",
-  "description": "Execute one explicit Q order. MOVE, STOP, CONTINUE, HACK_CAMERA, OPEN_VAULT, TAKE_RELIC. Wait for the engine result and report it accurately.",
+  "description": "Execute one explicit Q order and wait for the authoritative engine result. Movement, camera hacks, vault access, relic collection, or nearby suspicious guard knockdown.",
   "arguments": [
     {
       "name": "type",
-      "description": "One uppercase string: MOVE, STOP, CONTINUE, HACK_CAMERA, OPEN_VAULT, TAKE_RELIC."
+      "description": "One uppercase string: MOVE, STOP, CONTINUE, HACK_CAMERA, OPEN_VAULT, TAKE_RELIC, KNOCK_DOWN_GUARD."
     },
     {
       "name": "agent",
@@ -13,7 +13,11 @@
     },
     {
       "name": "target",
-      "description": "MOVE: gallery, security, vault, entrance. HACK_CAMERA: current or discovered camera_1 through camera_5. Omit entirely for STOP, CONTINUE, OPEN_VAULT, TAKE_RELIC."
+      "description": "MOVE: gallery, security, vault, entrance. HACK_CAMERA: current or discovered camera_2, camera_4, or camera_5. Omit entirely for STOP, CONTINUE, OPEN_VAULT, TAKE_RELIC."
+    },
+    {
+      "name": "via",
+      "description": "Optional for MOVE only: left or right. Use left when Q asks for the left/west side of Main Hall. Omit entirely for all other actions."
     }
   ],
   "expects_response": true

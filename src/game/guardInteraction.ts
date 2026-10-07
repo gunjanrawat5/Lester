@@ -1,7 +1,7 @@
 import { guardReactionSchema, type GuardContext } from '../ai/guardContracts';
-export const GUARD_RULES = { conversationRange: 60, suspicionPerReaction: 15, persuasiveTurns: 3, maxTurns: 12 } as const;
+export const GUARD_RULES = { conversationRange: 60, suspicionPerReaction: 40, persuasiveTurns: 3, maxTurns: 12 } as const;
 export type GuardGameEvent = {
-  type: 'SUSPICION_CHANGED' | 'PERSUASION_CHANGED' | 'KEYCARD_ACQUIRED' | 'ALARM_TRIGGERED';
+  type: 'SUSPICION_CHANGED' | 'PERSUASION_CHANGED' | 'KEYCARD_ACQUIRED' | 'ALARM_TRIGGERED' | 'GUARD_DOWN';
   source: 'guard_dialogue'; reason: string; suspicion: number; delta: number;
 };
 export type ReactionResult = {
@@ -12,6 +12,7 @@ export class GuardInteraction {
   suspicion = 0;
   persuasion = 0;
   keycardOwned = false;
+  knockedDown = false;
   private sessionId?: string;
   private turnId?: string;
   private turns = 0;
@@ -21,7 +22,15 @@ export class GuardInteraction {
   private readonly results = new Map<string, ReactionResult>();
   constructor(private readonly inRange: () => boolean, private readonly emit: (event: GuardGameEvent) => void = () => {}) {}
   get active() { return Boolean(this.sessionId); }
-  get available() { return !this.active && this.inRange() && !this.keycardOwned && this.suspicion < 100; }
+  get available() { return !this.knockedDown && !this.active && this.inRange() && !this.keycardOwned && this.suspicion < 100; }
+  get canKnockDown(){return !this.knockedDown&&this.suspicion>0&&this.inRange();}
+  knockDown(){
+    if(!this.canKnockDown)return {accepted:false,text:'Knockdown requires a nearby suspicious guard.'};
+    this.knockedDown=true;this.end();
+    this.emit({type:'GUARD_DOWN',source:'guard_dialogue',reason:'Guard knocked down. +20 alarm.',suspicion:this.suspicion,delta:0});
+    if(!this.keycardOwned){this.keycardOwned=true;this.emit({type:'KEYCARD_ACQUIRED',source:'guard_dialogue',reason:'Bond recovered the keycard from the knocked-down guard.',suspicion:this.suspicion,delta:0});}
+    return {accepted:true,text:'Guard down, Q. Keycard secured. +20 alarm.'};
+  }
   context(): GuardContext { return { suspicion: this.suspicion, persuasion: this.persuasion, keycardOwned: this.keycardOwned }; }
   begin(): string | undefined {
     if (!this.available) return undefined;
