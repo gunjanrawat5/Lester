@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MissionState} from '../src/game/mission';
-import {routeBetween} from '../src/game/previewNavigation';
+import {routeBetween,routeFromPosition} from '../src/game/previewNavigation';
 import {actionSchema,bondToolActionSchema} from '../src/ai/contracts';
 test('cameras need range and sight, reveal once, and hacks consume a two-charge budget only on success',()=>{
  const mission=new MissionState([{id:'camera_1',x:100,y:0},{id:'camera_2',x:300,y:0},{id:'camera_3',x:500,y:0}]);
@@ -56,4 +56,22 @@ test('Fish empty optional tool fields normalize without relaxing strict action v
  assert.equal(bondToolActionSchema.safeParse({type:'HACK_CAMERA',agent:'bond',target:'camera_2',via:'left'}).success,false);
  assert.equal(bondToolActionSchema.safeParse({type:'STOP',agent:'bond',target:'',via:'',alarm:0}).success,false);
  assert.equal(bondToolActionSchema.safeParse({type:'MOVE',agent:'bond',target:'',via:'left'}).success,false);
+});
+
+test('left route is honored on return from security and the vault',()=>{
+ for(const start of ['security','relic'] as const){const route=routeBetween(start,'extraction',true,'left');assert.ok(route.includes('hall_left_mid'));assert.ok(!route.includes('hall_east'));}
+ assert.ok(routeBetween('security','extraction',true,'right').includes('hall_east'));
+});
+test('retargeting and resuming use the current segment without unnecessary backtracking',()=>{
+ assert.equal(routeFromPosition({x:710,y:320},'junction','security','security')[0],'security');
+ assert.equal(routeFromPosition({x:710,y:320},'junction','security','extraction',false,'left')[0],'junction');
+ assert.equal(routeFromPosition({x:550,y:390},'hall','junction','security')[0],'junction');
+ assert.deepEqual(routeFromPosition({x:710,y:250},'security',undefined,'security'),[]);
+ assert.equal(routeFromPosition({x:710,y:250},'security',undefined,'extraction',false,'left')[0],'junction');
+ assert.deepEqual(routeFromPosition({x:710,y:320},'junction','security','relic',false),[]);
+});
+
+test('left ascent cannot be bypassed by the old right-side next waypoint',()=>{
+ const route=routeFromPosition({x:365,y:612},'entry','hall_south','security',false,'left');
+ assert.ok(route.includes('hall_left_mid'));assert.ok(!route.includes('hall_south'));assert.ok(!route.includes('hall_east'));
 });

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { MissionState, CAMERA_DETECTION_ALARM } from './mission';
 import { SecurityCamera, securityCameraLayout, cameraRay } from './securityCameras';
 import { MAP_WIDTH as W, MAP_HEIGHT as H, perimeter, waypoints } from './map';
-import { routeBetween, type NodeId } from './previewNavigation';
+import { routeBetween, routeFromPosition, type NodeId } from './previewNavigation';
 import { GuardInteraction, GUARD_RULES, type GuardGameEvent } from './guardInteraction';
 import type { PreviewAction } from '../ai/contracts';
 
@@ -40,6 +40,7 @@ export class MapScene extends Phaser.Scene {
   private bondRing?: Phaser.GameObjects.Arc;
   private currentNode: NodeId = 'extraction';
   private route: NodeId[] = [];
+  private segmentNext?:NodeId;
   private destination?: PreviewAction & { type: 'MOVE' };
   missionContext(){
     return {hacksRemaining:this.mission.hacksRemaining,cameras:this.mission.cameras.filter(c=>c.discovered).map(c=>({id:c.id,active:c.active})),currentCamera:this.mission.pendingCamera??'',keycardOwned:this.guard.keycardOwned,vaultOpen:this.mission.vaultOpen,relicOwned:this.mission.relicOwned,complete:this.mission.complete,alarm:this.mission.alarm,failed:this.mission.failed,guardSuspicion:this.guard.suspicion,guardKnockedDown:this.guard.knockedDown};
@@ -73,10 +74,13 @@ export class MapScene extends Phaser.Scene {
       if(!this.guard.keycardOwned)return {accepted:false,text:'Get the guard’s keycard before retrieving the relic, Q.'};
       const result=this.runCommand({type:'MOVE',agent:'bond',target:'vault'});if(result.accepted)this.collectOnArrival=true;return result;
     }
-    if (this.route.length) return { accepted: false, text: 'Already moving, Q. Say “stop” before giving me a new destination.' };
     const targets: Record<string, NodeId> = { gallery: 'hall', security: 'security', vault: this.mission.vaultOpen?'relic':'vault_door', entrance: 'extraction' };
-    const route = routeBetween(this.currentNode, targets[action.target],this.mission.vaultOpen,action.via);
-    if (!route.length) return { accepted: false, text: 'That route is unavailable.' };
+    const target=targets[action.target];
+    const route = routeFromPosition(this.bond,this.currentNode,this.segmentNext,target,this.mission.vaultOpen,action.via??'left');
+    if (!route.length) {
+      if(Math.hypot(this.bond.x-waypoints[target].x,this.bond.y-waypoints[target].y)>.01)return {accepted:false,text:'That route is unavailable.'};
+      this.route=[];this.destination=action;this.currentNode=target;this.segmentNext=undefined;this.arrive();return {accepted:true,text:'Already at that location, Q.'};
+    }
     this.interrupted=undefined;this.collectOnArrival=false;this.route = route; this.destination = action;
     return { accepted: true, text: action.target === 'vault' ? (this.guard.keycardOwned?'Moving to the vault. I’ll use the keycard at the door.':'Moving to the locked vault door. We need the guard’s keycard to enter.') : `Moving to ${action.target === 'gallery' ? 'the main hall' : action.target === 'entrance' ? 'extraction' : 'security staging'}, Q.` };
   }
@@ -107,11 +111,11 @@ export class MapScene extends Phaser.Scene {
     this.guardMarker?.setVisible(available || this.guard.active);
     if (this.commsPaused || this.guard.active || this.mission.failed || this.mission.complete || document.hidden) return;
     if (this.bond && this.route.length) {
-      const next = this.route[0], point = waypoints[next];
+      const next = this.route[0], point = waypoints[next];if(next!==this.currentNode)this.segmentNext=next;
       const dx = point.x - this.bond.x, dy = point.y - this.bond.y;
       const distance = Math.hypot(dx, dy), step = 120 * Math.min(delta, 50) / 1000;
       if (distance <= step) {
-        this.bond.setPosition(point.x, point.y); this.currentNode = next; this.route.shift();
+        this.bond.setPosition(point.x, point.y); this.currentNode = next;this.segmentNext=undefined; this.route.shift();
         if (!this.route.length) {
           this.arrive();
         }

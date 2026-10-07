@@ -9,3 +9,10 @@
 .portrait-bond{background-position:10.49% 6.41%}
 .portrait-security{background-position:96.15% 6.41%}
 .portrait-q{background-image:url('/assets/avatars/q.png');background-size:140.85% 139.15%;background-position:41.67% 5.43%}
+
+#mission-complete{padding:0;border:1px solid #168d94;border-radius:12px;background:radial-gradient(ellipse at top,#073c43,#071521 75%);color:#e8edf0;width:min(500px,calc(100vw - 36px));box-shadow:0 0 80px #05d8e625}
+#mission-complete::backdrop{background:#020b13d9;backdrop-filter:blur(7px)}
+#mission-complete .tiny,#mission-complete .game-over-alarm,#mission-complete .game-over-emblem{color:var(--cyan)}
+#mission-complete .game-over-emblem{border-color:var(--cyan);box-shadow:0 0 30px #05d8e633}
+#mission-complete h2{font-size:26px;letter-spacing:3px}
+#complete-play-again{width:100%;padding:14px;background:#0ad0db;color:#01252e;font:13px monospace;border-color:#27eaf1}

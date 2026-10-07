@@ -74,3 +74,7 @@ Final checks for the UI/alarm update: 17 unit tests and production build passed;
 The two left-wall cameras have been removed. Camera discovery still pauses Bond without an alarm penalty; detection by an active camera now adds +50 per exposure. Guard suspicion remains +40 and guard knockdown +20.
 
 The alarm reaching 100 stops gameplay and voice sessions and opens Game Over. Play Again resets the mission, alarm, keycard, relic, and two overrides. C02 is positioned at (510, 315), facing downward. Guard-triggered Game Over and restart were verified in Chrome with mocked voice sessions; all 17 tests and the production build pass.
+
+Left-route orders also apply on the return trip: “Bond, return to extraction via the left route.” New movement orders can replace a route mid-walk. Routing starts from Bond’s physical position on the current segment, including after STOP or camera discovery, so continuing toward the same destination does not first revisit the previous waypoint.
+
+Extracting with the relic opens Mission Complete with Play Again. A successful guard knockdown plays a pre-generated “Ahh!” clip in the configured Fish guard voice, once per knockdown, and respects reply mute. The clip is bundled locally so gameplay does not wait on a voice API request.

@@ -33,6 +33,7 @@ export function mountComms(options:{execute(action:PreviewAction):{accepted:bool
   const body=document.createElement('div'),label=document.createElement('span'),p=document.createElement('p');label.textContent=speaker;p.textContent=text;body.append(label,p);item.append(avatar,body);feed.append(item);while(feed.children.length>20)feed.firstElementChild?.remove();feed.scrollTop=feed.scrollHeight;
  };
  const reply=(speaker:string,text:string)=>{get('#latest-reply').textContent=text;add(speaker,text);};
+ const knockoutSound=new Audio('/assets/audio/guard-knockdown.mp3');knockoutSound.preload='auto';
  const bond=new BondDialogue(options.execute,{message:text=>reply('BOND',text),status:text=>{if(!guardMode&&!recording)status(text);},action:(_action,outcome)=>{get('#heard-action').textContent=outcome.text;add(outcome.accepted?'ORDER ACCEPTED':'ORDER BLOCKED',outcome.text);}},options.context);
  const dialogue=new GuardDialogue(options.guard,{message:text=>reply('GUARD',text),status:text=>{if(guardMode&&!recording&&!guardChanging)status(text);},ended:text=>{if(guardMode){exitGuard();status(text);}}});
  const refresh=()=>{
@@ -99,7 +100,7 @@ export function mountComms(options:{execute(action:PreviewAction):{accepted:bool
   micMuted=!micMuted;if(micMuted){cancelMic();status('Microphone muted. Typed commands remain available.');}else {status('Tap the mic to speak.');}
   get('#mic-mute').setAttribute('aria-pressed',String(micMuted));get('#mic-mute').setAttribute('aria-label',micMuted?'Unmute microphone':'Mute microphone');get('#mic-mute').innerHTML=icon(micMuted?'mute':'mic')+`<small>${micMuted?'UNMUTE':'MUTE'}</small>`;refresh();
  });
- get<HTMLButtonElement>('#sound').addEventListener('click',()=>{enabled=!enabled;bond.setSound(enabled);dialogue.setSound(enabled);get('#sound').setAttribute('aria-pressed',String(enabled));get('#sound').setAttribute('aria-label',enabled?'Mute replies':'Unmute replies');get('#sound').innerHTML=icon(enabled?'sound':'mute');});
+ get<HTMLButtonElement>('#sound').addEventListener('click',()=>{enabled=!enabled;if(!enabled)knockoutSound.pause();bond.setSound(enabled);dialogue.setSound(enabled);get('#sound').setAttribute('aria-pressed',String(enabled));get('#sound').setAttribute('aria-label',enabled?'Mute replies':'Unmute replies');get('#sound').innerHTML=icon(enabled?'sound':'mute');});
  get<HTMLFormElement>('#command-form').addEventListener('submit',event=>{event.preventDefault();void submit(input.value,'text');});
  root.querySelectorAll<HTMLButtonElement>('[data-command]').forEach(button=>button.addEventListener('click',()=>{input.value=button.dataset.command!;get<HTMLDetailsElement>('#text-panel').open=true;input.focus();}));
  get('#text-toggle').addEventListener('click',()=>{const panel=get<HTMLDetailsElement>('#text-panel');panel.open=!panel.open;if(panel.open)input.focus();});
@@ -113,6 +114,6 @@ export function mountComms(options:{execute(action:PreviewAction):{accepted:bool
     if(terminal){revision++;cancelMic();busy=false;guardWaiting=false;guardChanging=false;void bond.end();void dialogue.end();options.pause(true);status(next.failed?'GAME OVER · Alarm reached 100.':'Mission complete.');}
     get('#alarm-value').textContent=String(next.alarm);get('#alarm-meter').setAttribute('aria-valuenow',String(next.alarm));get('#alarm-meter').querySelectorAll('i').forEach((bar,i)=>bar.classList.toggle('filled',i<Math.ceil(next.alarm*36/100)));root.classList.toggle('alarm-high',next.alarm>=80);get('#hack-value').textContent=String(next.hacksRemaining);get('#keycard-value').textContent=next.keycardOwned?'✓':'—';get('#relic-value').textContent=next.relicOwned?'✓':'—';if(next.alarm>before)get('#alarm-event').textContent=`+${next.alarm-before} alarm · ${next.alarm>=100?'Mission compromised':'Keep your cover'}`;if(next.complete)get('#alarm-event').textContent='MISSION COMPLETE · Bond and relic extracted';refresh();},
   notify(text:string){reply('BOND / FIELD UPDATE',text);refresh();},guardAvailability(){refresh();},
-  guardEvent(event:GuardGameEvent){if(event.type==='SUSPICION_CHANGED')add('GUARD REACTION',`Suspicious. +40 alarm. ${event.reason}`);else if(event.type==='KEYCARD_ACQUIRED'||event.type==='GUARD_DOWN'||event.type==='ALARM_TRIGGERED')add('MISSION',event.reason);else add('GUARD REACTION','Your cover story sounds credible.');refresh();},
+  guardEvent(event:GuardGameEvent){if(event.type==='GUARD_DOWN'){cancelMic();void dialogue.end();add('GUARD','Ahh!');if(enabled){knockoutSound.currentTime=0;void knockoutSound.play().catch(()=>{});}}if(event.type==='SUSPICION_CHANGED')add('GUARD REACTION',`Suspicious. +40 alarm. ${event.reason}`);else if(event.type==='KEYCARD_ACQUIRED'||event.type==='GUARD_DOWN'||event.type==='ALARM_TRIGGERED')add('MISSION',event.reason);else add('GUARD REACTION','Your cover story sounds credible.');refresh();},
  };
 }
