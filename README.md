@@ -1,80 +1,129 @@
 # Operation Glasshouse
 
-You are Q. James Bond is the sole playable operative. The museum map has a Main Hall, a top-right Security Room, a bottom-right Vault and relic, an extraction point, and three fixed cameras (two on the right wall of Main Hall and one in the vault corridor).
+A voice-controlled stealth heist where you play **Q**, guiding **James Bond** through a museum to steal a relic and escape. Give Bond natural-language orders by voice or text, react to hidden security cameras, and switch into Bond’s role to persuade an AI security guard to hand over his keycard.
 
-## Run
+Bond and the guard are separate **Fish Audio conversational agents**, each with their own voice and role. The game validates their tool calls and controls movement, access, inventory, and alarm state. Talking about an action does not execute it: the agent must call a supported gameplay tool.
 
-Use Node.js 22.12+ and npm. Run `npm ci`, then `npm run dev`.
+## The mission
 
-- Frontend: http://127.0.0.1:5174
-- API health/configuration: http://127.0.0.1:3001/api/health
-- `npm test`: command validation and Fish adapter checks with mocked provider responses.
-- `npm run build`: TypeScript checks and browser production build into `dist/`.
-- `npm run preview`: browser build preview; keep `npm run start:server` running separately for API calls. Vite proxies `/api` on the standard server port 3001.
+1. Guide Bond through the Main Hall to the Security Room in the top-right corner.
+2. Talk to the guard as Bond and persuade him to give you the keycard.
+3. Reach the Vault in the bottom-right corner. The keycard is required to open it.
+4. Collect the relic and return to the extraction point.
 
-## Voice setup
+Extracting with the relic opens **Mission Complete**. Reaching **100 alarm** opens **Game Over**. Both screens offer **Play Again**, which resets the mission, inventory, alarm, and two camera hacks.
 
-Bond is the public Fish Audio agent `e8434f5b6cc646c4b426c07d01ebfd72`. **Send** connects directly using the official Web SDK; Fish supplies both reasoning and spoken replies, with captions and sound control. Bond uses the voice configured on that agent. No API key or separate Bond voice ID is required for text conversations.
+## Gameplay
 
-Bond and the guard are now published with their gameplay client tools (Bond version 4, guard version 3). See [Bond prompt and exact tool declaration](docs/Fish_Bond_Agent_Setup.md). The browser can register handlers but cannot add tool definitions to a public agent. Without the tool, Bond can converse but his replies do not move the character.
+### Give Bond orders
 
-For optional Fish speech transcription, set `FISH_API_KEY` in the ignored `.env` and restart `npm run dev`. Input uses the [Fish speech-to-text endpoint](https://docs.fish.audio/api-reference/endpoint/openapi-v1/speech-to-text), multipart audio, and `model: transcribe-1-pro`. Without a key, input defaults to **Browser speech · Demo fallback**, which may use the browser vendor’s online recognition service. Allow microphone access in a supported browser, or type directly. Both input providers send to the real Bond agent. The public Bond and guard sessions do not require an API key; never expose it in client code.
+Tap the microphone, speak, and pause. The completed transcript sends automatically and appears under **YOU SAID**. Listening ends after each utterance and does not restart automatically. You can tap the microphone again to finish recording immediately.
 
-## Security guard conversation
+Typed commands have a separate text box and **Send** button; voice input never overwrites your typed draft. Example chips fill the text box for review. Microphone mute and reply mute are separate controls.
 
-Tell Bond to go to security. When he is stationary within range of the guard, select **Persuade guard**. The panel switches to **YOU ARE JAMES BOND**; all subsequent speech/text goes to the guard, rather than the Bond agent. Tap the mic to speak; finished voice turns send automatically. Typed commands use the separate text channel. Select **Return to Q** to resume giving orders.
+Try commands such as:
 
-The guard connects directly to public Fish agent `50a6c83da0584763bc7662f6908454a3`, using its configured voice. No API key or separate guard voice ID is needed. Allow `http://127.0.0.1:5174` and configure the `guard_reaction` client tool; see [guard setup](docs/Fish_Guard_Agent_Setup.md).
+- “Bond, go to security via the left side of the hall.”
+- “Bond, stop.”
+- “Hack the camera you just spotted.”
+- “Continue to your previous destination.”
+- “Get the relic from the vault.”
+- “Return to extraction via the left route.”
 
-Suspicious tool-assessed turns add 40 to guard suspicion and to the shared alarm. Three distinct persuasive turns grant the keycard once. While a nearby guard is suspicious, the dialogue panel offers Knock down guard: this ends the session, adds 20 alarm, and recovers his keycard once. State persists when returning to Q. A connection error returns to Q without silently substituting a demo guard.
+Give one command at a time. New movement orders can replace an existing destination mid-walk. Routes start from Bond’s physical position on his current path segment, avoiding unnecessary trips back to the previous waypoint. The left path is the default; an explicit right-side request selects the right path. Left-route instructions work on outbound and return trips. Clicking the map inspects rooms rather than moving Bond.
 
-## Commands and controls
+### Handle cameras
 
-Tap the microphone to start speaking. Recording ends after the utterance and does not restart automatically. Use Mute to cancel capture. Browser speech finishes on its end-of-utterance event; Fish recording finishes after about 1.4 seconds of silence after speech. You can tap the mic to finish an utterance immediately. The resulting transcript automatically sends to the active Bond/guard agent and appears under YOU SAID. Voice never overwrites your typed draft. The separate text channel retains its Send button. Recordings are capped at 15 seconds. Muting the mic, leaving the tab, or window blur cancels capture. Blank/failed/cancelled transcripts execute nothing. Voice auto-send errors keep the transcript visible for manual retry.
+Three static cameras remain: two on the right side of the Main Hall and one in the vault corridor. C02 faces downward. Cameras and their red sectors start hidden.
 
-Try:
+When Bond gets close enough to spot a camera with line of sight, he reveals it, stops, and asks Q what to do. **Discovery itself adds no alarm.** You have **two camera hacks** for the mission. A hack permanently disables a discovered camera; say “continue” afterward to resume the interrupted route. You can also continue without using a hack.
 
-- “Bond, go to the main hall.”
-- “Could you head to security please?”
-- “Bond, approach the vault.”
-- “Return to extraction.” / “Get everyone out.”
-- “Bond, stop.” / “Hold position.”
-- “Bond, what are our options?”
+Entering an active camera’s sector adds **50 alarm** once per continuous exposure. Detection can trigger again after Bond has spent two seconds outside the sector. Disabled cameras cannot detect him.
 
-Example chips fill the text box; **Send** submits it. Give one command at a time. If Bond is moving, stop him before changing destinations. He follows waypoint routes around the displays. Vault commands use the keycard at the door if owned and then enter; without it, Bond waits outside. Map clicks inspect rooms and do not move Bond.
+### Talk to the guard
 
-## Current scope and validation
+When Bond is stationary near the guard, select **Persuade guard**. The panel switches to **YOU ARE JAMES BOND**, and your voice or text goes directly to the guard agent. Select **Return to Q** to resume directing Bond.
 
-The playable mission is now: get the security guard’s keycard, use it at the vault door, collect the relic in the bottom-right room, and return to extraction. The vault route cannot enter without the card. “Get the relic” routes Bond through the unlocked doorway and collects it when he is physically in range; “go to the vault” stages him beside the relic and waits for a collection order.
+Three distinct persuasive turns earn the keycard. Suspicious turns increase the guard’s suspicion and add **40 alarm**. Once the nearby guard becomes suspicious, **Knock down guard** becomes available during the conversation. It ends the encounter, recovers his keycard, and adds **20 alarm**. A short “Ahh!” clip in the guard’s configured Fish voice plays on knockdown and respects reply mute.
 
-Cameras start completely hidden. While moving, Bond discovers a camera within 110 logical pixels with line of sight, reveals its fixed red sector, stops his route, and reports through the Fish agent: a camera is present, what should he do, and how many hacks remain. Each camera triggers this interruption once. “Hack the camera” permanently disables the current discovered camera and consumes one of exactly two charges. Hacking alone does not resume the route: say “continue”, or choose another destination. “Continue” also lets you proceed without spending a hack. Entering an active wall-clipped camera sector adds 50 alarm once per continuous exposure. Two seconds outside the sector re-arms detection. Disabled cameras cannot detect. The segmented alarm HUD shares camera, guard (+40), and knockdown (+20) penalties; at 100 the mission is compromised and movement stops. Restart is available in voice settings.
+| Event | Alarm increase |
+| --- | ---: |
+| Bond discovers a camera | 0 |
+| Active camera detects Bond | +50 |
+| Guard finds a turn suspicious | +40 |
+| Bond knocks down the guard | +20 |
 
-Capture, transcription, agent turns, and the full guard conversation pause Bond and detection. Bond turns release the pause after his spoken response; guard dialogue pauses throughout. Requests are bounded (30 seconds for a Bond response, 15 seconds for server Fish calls, 18 seconds client-side for transcription); errors retain editable input and release the pause. Reply playback is canceled before recording. Requests are not automatically retried.
+Voice capture, transcription, agent responses, and guard conversations pause movement and camera detection. Cancelled or empty transcripts execute nothing. Connection errors show a status message and preserve typed input; requests are not automatically retried.
 
-Checked: strict command schemas, supported/unsupported orders, Fish request headers/form bodies, speaker-marker cleanup, malformed/provider-error responses, typed movement and arrival, stop, automatic voice turns with a separate typed draft, microphone denial, MediaRecorder upload, and desktop/mobile layout. Browser speech and Fish responses were mocked for automated checks; live Fish transcription requires valid credentials; public Bond conversations require public access and movement requires the published client tool.
+## Run locally
 
-Guard tests also check proximity gates, repeated/stale reactions, capped suspicion, the alarm trigger, distinct persuasion turns, and one keycard transfer. Agent SDK browser checks use a mocked session; live guard behavior needs your published agent and its tool configuration.
+Use a recent Node.js release supported by Vite 8; this project has been developed with Node.js 26 and npm.
 
-Geometry and waypoints: `src/game/map.ts`. Camera settings: `src/game/securityCameras.ts`. Voice adapters: `server/fish.ts`. No art assets require payment; [asset credits](public/assets/ASSET_CREDITS.md) include the Kenney CC0 license.
+```sh
+npm ci
+cp .env.example .env
+npm run dev
+```
 
-The [revised design](docs/Voice_Heist_Agent_Design_Doc.md) describes the full intended game. The original document is preserved alongside it for reference.
+If `.env` already exists, keep your existing configuration instead of replacing it.
 
-## Agent configuration automation
+Open **http://127.0.0.1:5174**. The development command starts both Vite and the Express API. Vite forwards `/api` requests to port **3001**. API health is available at **http://127.0.0.1:3001/api/health**. Stop the development servers with **Ctrl+C**.
 
-One Fish workspace API key can manage both agents in that workspace. Keep it in the ignored `.env` as `FISH_API_KEY`. `npm run setup:fish` reviews the planned changes; `npm run setup:fish -- --apply` creates or reuses the client tools, preserves existing tool attachments and voice settings, adds gameplay instructions, verifies each configuration, and publishes both agents. Private configuration backups are written to a temporary directory before updates. Re-running the script reuses existing client tools and replaces its marked prompt section.
+### Fish Audio configuration
 
-Live verification after publishing: Bond's MOVE tool drove him to security, the guard's suspicious reaction emitted the engine suspicion event, and returning to Q created a fresh Bond session.
+The project connects to these public agents through the Fish Audio Web SDK:
 
-Verified for this update: 12 unit tests; full mission browser flow with mocked Fish sessions (camera discovery/stop/report, two hacks, guard keycard, gated vault, relic removal, extraction, mobile layout).
+| Character | Agent ID | Gameplay tool |
+| --- | --- | --- |
+| Bond | `e8434f5b6cc646c4b426c07d01ebfd72` | `bond_command` |
+| Security guard | `50a6c83da0584763bc7662f6908454a3` | `guard_reaction` |
 
-The reference-inspired cyan comms panel includes a segmented alarm meter, override/keycard/relic status, mic orb, auto-sent transcript, character replies and history, separate text controls, mic/reply mute, and settings. Say “take the left route to security” to use the west-side waypoint path around the exhibit. Browser checks cover both browser-recognition and Fish-recording auto-send, cancellation, typed draft preservation, +20 camera detection, +40 guard suspicion, +20 mid-dialogue knockdown, static directions, and desktop/mobile layout.
+Both agents must have public access enabled, allow **http://127.0.0.1:5174**, and have their gameplay client tools configured and published. Public conversations use each agent’s configured voice and do not require a browser API key. These IDs refer to the configured project agents; to use your own, update the IDs in the dialogue modules and configure the corresponding tools.
 
-Final checks for the UI/alarm update: 17 unit tests and production build passed; mocked browser checks covered browser/Fish auto-send, draft preservation, static sectors, +20 exposure, +40 guard suspicion, +20 knockdown, and responsive layout. Live Fish checks confirmed left routing, camera reporting/hacking, and guard suspicion/knockdown.
+For **Fish speech transcription**, set `FISH_API_KEY` in the local `.env`. Without it, input defaults to browser speech recognition where supported. Both transcription options send the resulting text to the same Fish conversational agents. Allow microphone access, or use typed commands.
 
-The two left-wall cameras have been removed. Camera discovery still pauses Bond without an alarm penalty; detection by an active camera now adds +50 per exposure. Guard suspicion remains +40 and guard knockdown +20.
+Keep API keys server-side. Never commit `.env` or expose secrets through `VITE_` variables. The optional voice ID variables in `.env.example` support standalone server TTS; they are not required for the public agent conversations. The knockout sound is bundled locally and does not make an API request during play.
 
-The alarm reaching 100 stops gameplay and voice sessions and opens Game Over. Play Again resets the mission, alarm, keycard, relic, and two overrides. C02 is positioned at (510, 315), facing downward. Guard-triggered Game Over and restart were verified in Chrome with mocked voice sessions; all 17 tests and the production build pass.
+Agent setup details:
 
-Left-route orders also apply on the return trip: “Bond, return to extraction via the left route.” New movement orders can replace a route mid-walk. Routing starts from Bond’s physical position on the current segment, including after STOP or camera discovery, so continuing toward the same destination does not first revisit the previous waypoint.
+- [Bond prompt and client tool](docs/Fish_Bond_Agent_Setup.md)
+- [Security guard prompt and client tool](docs/Fish_Guard_Agent_Setup.md)
 
-Extracting with the relic opens Mission Complete with Play Again. A successful guard knockdown plays a pre-generated “Ahh!” clip in the configured Fish guard voice, once per knockdown, and respects reply mute. The clip is bundled locally so gameplay does not wait on a voice API request.
+For the configured agents, `npm run setup:fish` reviews planned configuration changes. **`npm run setup:fish -- --apply` updates and publishes both agents** using the workspace API key. The script preserves voice settings and existing tool attachments and saves private configuration backups to a temporary directory.
+
+## Technology and structure
+
+The frontend uses **Phaser** for the map and gameplay, **TypeScript** for game logic, and **Vite** for development and builds. **Express** handles server-side Fish transcription and optional voice endpoints. **Zod** validates gameplay actions and dialogue reactions. The communications panel includes a segmented alarm meter, inventory indicators, separate voice/text controls, and Bond, Security, and Q portraits.
+
+| Location | Purpose |
+| --- | --- |
+| `src/game/MapScene.ts` | Movement, encounters, and mission integration |
+| `src/game/map.ts` | Museum geometry and waypoint graph |
+| `src/game/previewNavigation.ts` | Route selection and position-aware retargeting |
+| `src/game/mission.ts` | Cameras, hacks, vault, relic, and alarm state |
+| `src/game/guardInteraction.ts` | Persuasion, suspicion, keycard, and knockdown |
+| `src/voice/` | Fish agent sessions, microphone capture, and playback |
+| `src/ui/` | Communications panel, controls, and portraits |
+| `server/` | API routes and Fish service adapters |
+| `public/assets/` | Character sprites, portraits, and knockout audio |
+| `tests/` | Action validation, provider adapters, and gameplay regression tests |
+
+## Checks and builds
+
+```sh
+npm test            # Automated tests
+npm run typecheck   # TypeScript checks
+npm run build       # Typecheck and build the frontend into dist/
+```
+
+The current suite contains **20 tests**, covering strict actions, Fish adapters, guard proximity and duplicate reactions, persuasion and keycards, vault access, camera detection and hacks, shared alarm penalties, left-side return routes, and retargeting without unnecessary backtracking.
+
+Browser checks have also exercised voice auto-send, separate typed drafts, mute cancellation, portraits, movement, knockdown audio events, and both end screens with replay resets. Automated voice checks use mocked provider sessions; live conversations depend on the Fish agents’ availability and configuration.
+
+`npm run start:server` starts the API separately. `npm run preview` previews the built frontend; it does not start the API or configure a production deployment. A hosted deployment needs `/api` routing to the backend and its origin allowed on both Fish agents.
+
+## Assets and design
+
+Bond and guard map sprites come from **Kenney Top-down Shooter (CC0)**. Museum geometry and the tactical interface are drawn in code. Portraits were supplied for this project, and the guard knockout clip was generated using his configured Fish voice. See [asset credits](public/assets/ASSET_CREDITS.md) for the Kenney source and license.
+
+The [revised design document](docs/Voice_Heist_Agent_Design_Doc.md) describes the broader intended game. The [original design](docs/Voice_Heist_Agent_Design_Doc.original.md) is preserved for reference; this README describes the currently implemented mission.
